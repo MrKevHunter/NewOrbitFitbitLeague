@@ -1,6 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 
-namespace neworbitfitbitleague.Controllers
+namespace neworbitfitbitleague.Models
 {
     public class NewOrbitEmployee : TableEntity
     {

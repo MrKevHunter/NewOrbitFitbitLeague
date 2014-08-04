@@ -7,6 +7,7 @@ using Fitbit.Api;
 using Fitbit.Models;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using neworbitfitbitleague.Models;
 
 namespace neworbitfitbitleague.Controllers
 {
@@ -52,6 +53,7 @@ namespace neworbitfitbitleague.Controllers
             return data.OrderByDescending(x => x.StepsToday).ToList();
         }
 
+
         public ActionResult AddMyDetails()
         {
             RequestToken token = authenticator.GetRequestToken();
@@ -68,7 +70,7 @@ namespace neworbitfitbitleague.Controllers
             CloudTable table = tableClient.GetTableReference("temp");
             table.CreateIfNotExists();
             table.Execute(
-                TableOperation.Insert(new MyTempTable {TempKey = input, PartitionKey = "x", RowKey = "y"}));
+                TableOperation.Insert(new MyTempTable {TempKey = input, PartitionKey = "x", RowKey = input}));
         }
 
         private string GetToken()
@@ -78,7 +80,7 @@ namespace neworbitfitbitleague.Controllers
             MyTempTable item = (from t in table.CreateQuery<MyTempTable>()
                 select t).First();
             string tempKey = item.TempKey;
-            table.DeleteIfExists();
+            table.Execute(TableOperation.Delete(item));
             return tempKey;
         }
 
