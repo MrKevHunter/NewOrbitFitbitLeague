@@ -28,6 +28,13 @@ namespace neworbitfitbitleague.Controllers
 
         public ActionResult Index()
         {
+            List<FitBitModel> data = BuildViewModel();
+
+            return View(data);
+        }
+
+        private List<FitBitModel> BuildViewModel()
+        {
             CloudTableClient tableClient = GetTable();
             CloudTable table = tableClient.GetTableReference("users");
             table.CreateIfNotExists();
@@ -42,7 +49,7 @@ namespace neworbitfitbitleague.Controllers
                 string totalSteps = fitbitClient.GetDayActivity(DateTime.Now).Summary.Steps.ToString();
                 data.Add(new FitBitModel {Name = name, StepsToday = totalSteps});
             }
-            return View(data.OrderByDescending(x => x.StepsToday));
+            return data.OrderByDescending(x => x.StepsToday).ToList();
         }
 
         public ActionResult AddMyDetails()
@@ -95,9 +102,15 @@ namespace neworbitfitbitleague.Controllers
 
             //execute the Authenticator request to Fitbit
             AuthCredential credential = authenticator.ProcessApprovedAuthCallback(token);
-            CloudTableClient tableClient = GetTable();
-            CloudTable table = tableClient.GetTableReference("users");
-            table.CreateIfNotExists();
+
+            AddEmployeeIfNotPresent(credential);
+
+            return RedirectToAction("Index", "Home");
+        }
+
+        private void AddEmployeeIfNotPresent(AuthCredential credential)
+        {
+            CloudTable table = GetUsersTable();
 
             NewOrbitEmployee employee = (from e in table.CreateQuery<NewOrbitEmployee>()
                 select e).ToList().FirstOrDefault(x => x.UserId == credential.UserId);
@@ -115,8 +128,14 @@ namespace neworbitfitbitleague.Controllers
                 table.Execute(
                     TableOperation.Insert(newOrbitEmployee));
             }
+        }
 
-            return RedirectToAction("Index", "Home");
+        private static CloudTable GetUsersTable()
+        {
+            CloudTableClient tableClient = GetTable();
+            CloudTable table = tableClient.GetTableReference("users");
+            table.CreateIfNotExists();
+            return table;
         }
 
         private static CloudTableClient GetTable()
@@ -124,24 +143,6 @@ namespace neworbitfitbitleague.Controllers
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
             CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
             return tableClient;
-        }
-
-        public class FitBitModel
-        {
-            public string Name { get; set; }
-            public string StepsToday { get; set; }
-        }
-
-        private class MyTempTable : TableEntity
-        {
-            public string TempKey { get; set; }
-        }
-
-        public class NewOrbitEmployee : TableEntity
-        {
-            public string UserId { get; set; }
-            public string AuthToken { get; set; }
-            public string AuthSecret { get; set; }
         }
     }
 }

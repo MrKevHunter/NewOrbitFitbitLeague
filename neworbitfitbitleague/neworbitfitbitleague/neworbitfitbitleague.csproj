@@ -151,7 +151,10 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Models\FitBitModel.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Models\MyTempTable.cs" />
+    <Compile Include="Models\NewOrbitEmployee.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
@@ -188,10 +191,10 @@
     <Content Include="Scripts\respond.js" />
     <Content Include="Scripts\respond.min.js" />
     <Content Include="Scripts\_references.js" />
-    <Content Include="sorter\asc.gif" />
-    <Content Include="sorter\bg.gif" />
-    <Content Include="sorter\desc.gif" />
-    <Content Include="sorter\style.css" />
+    <Content Include="Content\sorter\asc.gif" />
+    <Content Include="Content\sorter\bg.gif" />
+    <Content Include="Content\sorter\desc.gif" />
+    <Content Include="Content\sorter\style.css" />
     <Content Include="tablesorter.txt" />
     <Content Include="Web.config" />
     <Content Include="Web.Debug.config">
@@ -211,7 +214,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
-    <Folder Include="Models\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="fonts\glyphicons-halflings-regular.woff" />
