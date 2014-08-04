@@ -1,0 +1,28 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<div class="jumbotron">
+    <p class="lead">The Neworbit Ltd fitbit league table.</p>
+</div>
+
+<div class="row">
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Steps Today</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@row.Name</td>
+                    <td>@row.StepsToday</td>
+                </tr>
+            }
+
+        </tbody>
+    </table>
+</div>
