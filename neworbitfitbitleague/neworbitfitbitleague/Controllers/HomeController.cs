@@ -1,150 +1,153 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Linq;
 using System.Web.Mvc;
 using Fitbit.Api;
 using Fitbit.Models;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
 using neworbitfitbitleague.Models;
+using Newtonsoft.Json;
+using RestSharp;
+using User = neworbitfitbitleague.Models.User;
 
 namespace neworbitfitbitleague.Controllers
 {
     public class HomeController : Controller
     {
-        private static readonly string connectionString =
-            ConfigurationManager.AppSettings["tableStorageConnectionString"];
-
-        private readonly Authenticator authenticator;
-
-        public HomeController()
-        {
-            authenticator = new Authenticator(ConfigurationManager.AppSettings["consumerKey"],
-                ConfigurationManager.AppSettings["consumerSecret"],
-                "http://api.fitbit.com/oauth/request_token",
-                "http://api.fitbit.com/oauth/access_token",
-                "http://api.fitbit.com/oauth/authorize");
-        }
-
         public ActionResult Index()
         {
-            List<FitBitModel> data = BuildViewModel();
+            List<StepsModel> data = BuildViewModel();
 
             return View(data);
         }
 
-        private List<FitBitModel> BuildViewModel()
+        private List<StepsModel> BuildViewModel()
         {
-            CloudTableClient tableClient = GetTable();
-            CloudTable table = tableClient.GetTableReference("users");
-            table.CreateIfNotExists();
-            IQueryable<NewOrbitEmployee> query = from employee in table.CreateQuery<NewOrbitEmployee>()
-                select employee;
+            IQueryable<User> query = new TableStorageService().GetAllEmployees();
             ViewBag.TotalEmployees = query.ToList().Count();
-            var data = new List<FitBitModel>();
-            foreach (NewOrbitEmployee newOrbitEmployee in query)
+            var data = new List<StepsModel>();
+            foreach (User newOrbitEmployee in query)
             {
-                FitbitClient fitbitClient = GetFitbitClient(newOrbitEmployee.AuthToken, newOrbitEmployee.AuthSecret);
-                string name = fitbitClient.GetUserProfile().FullName;
-                string totalSteps = fitbitClient.GetDayActivity(DateTime.Now).Summary.Steps.ToString();
-                data.Add(new FitBitModel {Name = name, StepsToday = totalSteps});
+                if (!string.IsNullOrWhiteSpace(newOrbitEmployee.FitbitOAuthSettings))
+                {
+                    var settings =
+                        JsonConvert.DeserializeObject<FitbitOAuthSettings>(
+                            newOrbitEmployee.FitbitOAuthSettings);
+                    FitbitClient fitbitClient = new FitbitService().GetFitbitClient(settings.AuthToken,
+                        settings.AuthSecret);
+                    int totalSteps = fitbitClient.GetDayActivity(DateTime.Now).Summary.Steps;
+                    data.Add(new StepsModel
+                    {
+                        Name = newOrbitEmployee.Name,
+                        StepsToday = totalSteps,
+                        StepsWeek =
+                            fitbitClient.GetTimeSeries(TimeSeriesResourceType.Steps, DateTime.Now,
+                                DateRangePeriod.OneWeek).DataList.Select(x => Convert.ToInt32(x.Value)).Sum()
+                    });
+                }
+                if (!string.IsNullOrWhiteSpace(newOrbitEmployee.MovesAccessToken))
+                {
+                    var settings =
+                        JsonConvert.DeserializeObject<MovesAccessToken>(
+                            newOrbitEmployee.MovesAccessToken);
+
+                    int stepsToday = new MovesService().GetStepsToday(settings);
+                    int stepsWeek = new MovesService().GetStepsWeek(settings);
+                    data.Add(new StepsModel
+                    {
+                        Name = newOrbitEmployee.Name,
+                        StepsToday = stepsToday,
+                        StepsWeek = stepsWeek
+                    });
+                }
             }
-            return data.OrderByDescending(x => x.StepsToday).ToList();
+            return data.OrderByDescending(x => x.StepsWeek).ToList();
         }
 
 
+        [HttpGet]
         public ActionResult AddMyDetails()
         {
-            RequestToken token = authenticator.GetRequestToken();
-            StoreToken(token.Secret);
-            string authUrl = authenticator.GenerateAuthUrlFromRequestToken(token, true);
+            return View();
+        }
 
+        [HttpPost]
+        public ActionResult AddMyDetails(AddDetailViewModel addDetailViewModel)
+        {
+            if (!ModelState.IsValid)
+            {
+                return RedirectToAction("AddMyDetails");
+            }
 
+            User employee =
+                new TableStorageService().GetAllEmployees().ToList()
+                    .FirstOrDefault(x => x.EmailAddress == addDetailViewModel.EmailAddress);
+
+            if (employee != null)
+            {
+                return RedirectToAction("Index");
+            }
+
+            var newOrbitEmployee = new User
+            {
+                PartitionKey = "neworbit",
+                RowKey = addDetailViewModel.EmailAddress,
+                EmailAddress = addDetailViewModel.EmailAddress,
+                StepperMeasurer = addDetailViewModel.StepperMeasurer,
+                Name = addDetailViewModel.Name,
+            };
+            new TableStorageService().InsertUser(newOrbitEmployee);
+            if (addDetailViewModel.StepperMeasurer == StepCounterApplication.Fitbit)
+            {
+                return RedirectToAction("LinkToFitbit", "Home", new {email = addDetailViewModel.EmailAddress});
+            }
+            if (addDetailViewModel.StepperMeasurer == StepCounterApplication.Moves)
+            {
+                return RedirectToAction("LinkToMoves", "Home", new {email = addDetailViewModel.EmailAddress});
+            }
+            return View();
+        }
+
+        public ActionResult LinkToFitbit(string email)
+        {
+            RequestToken token = new FitbitService().GetRequestToken();
+            new FitbitService().StoreToken(token, email);
+            string authUrl = new FitbitService().GenerateAuthUrlFromRequestToken(token, true);
             return Redirect(authUrl);
         }
 
-        private void StoreToken(string input)
-        {
-            CloudTableClient tableClient = GetTable();
-            CloudTable table = tableClient.GetTableReference("temp");
-            table.CreateIfNotExists();
-            table.Execute(
-                TableOperation.Insert(new MyTempTable {TempKey = input, PartitionKey = "x", RowKey = input}));
-        }
-
-        private string GetToken()
-        {
-            CloudTableClient tableClient = GetTable();
-            CloudTable table = tableClient.GetTableReference("temp");
-            MyTempTable item = (from t in table.CreateQuery<MyTempTable>()
-                select t).First();
-            string tempKey = item.TempKey;
-            table.Execute(TableOperation.Delete(item));
-            return tempKey;
-        }
-
-        private FitbitClient GetFitbitClient(string token, string secret)
-        {
-            var client = new FitbitClient(ConfigurationManager.AppSettings["consumerKey"],
-                ConfigurationManager.AppSettings["consumerSecret"],
-                token,
-                secret);
-
-            return client;
-        }
-
-        //Final step. Take this authorization information and use it in the app
-        public ActionResult Callback()
+        public ActionResult FitbitCallback()
         {
             var token = new RequestToken();
             token.Token = Request.Params["oauth_token"];
-            token.Secret = GetToken();
+            FitbitToken fitbitToken = new FitbitService().GetToken(token.Token);
+            token.Secret = fitbitToken.RowKey;
             token.Verifier = Request.Params["oauth_verifier"];
 
-            //execute the Authenticator request to Fitbit
-            AuthCredential credential = authenticator.ProcessApprovedAuthCallback(token);
-
-            AddEmployeeIfNotPresent(credential);
-
+            AuthCredential credential = new FitbitService().ProcessApprovedAuthCallback(token);
+            new FitbitService().UpdateEmployeeWithCredentials(credential, fitbitToken);
             return RedirectToAction("Index", "Home");
         }
 
-        private void AddEmployeeIfNotPresent(AuthCredential credential)
+        public ActionResult LinkToMoves(string email)
         {
-            CloudTable table = GetUsersTable();
-
-            NewOrbitEmployee employee = (from e in table.CreateQuery<NewOrbitEmployee>()
-                select e).ToList().FirstOrDefault(x => x.UserId == credential.UserId);
-
-            if (employee == null)
-            {
-                var newOrbitEmployee = new NewOrbitEmployee
-                {
-                    AuthSecret = credential.AuthTokenSecret,
-                    UserId = credential.UserId,
-                    AuthToken = credential.AuthToken,
-                    PartitionKey = "ts",
-                    RowKey = credential.UserId,
-                };
-                table.Execute(
-                    TableOperation.Insert(newOrbitEmployee));
-            }
+            return
+                Redirect(
+                    string.Format(
+                        "https://api.moves-app.com/oauth/v1/authorize?response_type=code&client_id={0}&scope=activity&redirect_uri={1}",
+                        Config.moveClientId, Config.moveRedirect + "?email=" + email));
         }
 
-        private static CloudTable GetUsersTable()
+        public ActionResult MovesCallback(string code, string email)
         {
-            CloudTableClient tableClient = GetTable();
-            CloudTable table = tableClient.GetTableReference("users");
-            table.CreateIfNotExists();
-            return table;
-        }
-
-        private static CloudTableClient GetTable()
-        {
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
-            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-            return tableClient;
+            string uri =
+                string.Format(
+                    "https://api.moves-app.com/oauth/v1/access_token?grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}"
+                    , code, Config.moveClientId, Config.moveSecret, Config.moveRedirect + "?email=" + email);
+            var client = new RestClient();
+            IRestResponse restResponse = client.Post(new RestRequest(uri));
+            var movesAccessToken = JsonConvert.DeserializeObject<MovesAccessToken>(restResponse.Content);
+            new MovesService().SaveUser(email, movesAccessToken);
+            return RedirectToAction("Index");
         }
     }
 }
