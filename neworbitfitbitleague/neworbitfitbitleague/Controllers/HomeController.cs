@@ -29,20 +29,27 @@ namespace neworbitfitbitleague.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(newOrbitEmployee.FitbitOAuthSettings))
                 {
-                    var settings =
-                        JsonConvert.DeserializeObject<FitbitOAuthSettings>(
-                            newOrbitEmployee.FitbitOAuthSettings);
-                    FitbitClient fitbitClient = new FitbitService().GetFitbitClient(settings.AuthToken,
-                        settings.AuthSecret);
-                    int totalSteps = fitbitClient.GetDayActivity(DateTime.Now).Summary.Steps;
-                    data.Add(new StepsModel
+                    try
                     {
-                        Name = newOrbitEmployee.Name,
-                        StepsToday = totalSteps,
-                        StepsWeek =
-                            fitbitClient.GetTimeSeries(TimeSeriesResourceType.Steps, DateTime.Now,
-                                DateRangePeriod.OneWeek).DataList.Select(x => Convert.ToInt32(x.Value)).Sum()
-                    });
+                        var settings =
+                            JsonConvert.DeserializeObject<FitbitOAuthSettings>(
+                                newOrbitEmployee.FitbitOAuthSettings);
+                        FitbitClient fitbitClient = new FitbitService().GetFitbitClient(settings.AuthToken,
+                            settings.AuthSecret);
+                        int totalSteps = fitbitClient.GetDayActivity(DateTime.Now).Summary.Steps;
+                        data.Add(new StepsModel
+                                     {
+                                         Name = newOrbitEmployee.Name,
+                                         StepsToday = totalSteps,
+                                         StepsWeek =
+                                             fitbitClient.GetTimeSeries(TimeSeriesResourceType.Steps, DateTime.Now,
+                                                 DateRangePeriod.OneWeek).DataList.Select(x => Convert.ToInt32(x.Value)).Sum()
+                                     });
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
                 }
                 if (!string.IsNullOrWhiteSpace(newOrbitEmployee.MovesAccessToken))
                 {

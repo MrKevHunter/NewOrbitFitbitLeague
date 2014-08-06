@@ -9,7 +9,7 @@ namespace neworbitfitbitleague.Models
     public class TableStorageService
     {
         private static readonly string connectionString =
-           ConfigurationManager.AppSettings["tableStorageConnectionString"] ?? "UseDevelopmentStorage=true;";
+           ConfigurationManager.AppSettings["tableStorageConnectionString"] ?? "DefaultEndpointsProtocol=http;AccountName=abmanleague;AccountKey=Wq4T2CxY1dpXftGEr3Zl6nxs3ZTCzY0ttMQkEhWGUxLcGtRAxwl1uLsS+GvIHqvAJnpG3fGgj9eVDPoNowvwUg==;";
 
         public CloudTable GetUsersTable()
         {

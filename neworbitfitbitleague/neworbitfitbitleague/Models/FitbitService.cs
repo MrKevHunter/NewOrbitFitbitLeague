@@ -70,6 +70,7 @@ namespace neworbitfitbitleague.Models
 
         public FitbitClient GetFitbitClient(string token, string secret)
         {
+
             var client = new FitbitClient(consumerKey,
                 consumerSecret,
                 token,

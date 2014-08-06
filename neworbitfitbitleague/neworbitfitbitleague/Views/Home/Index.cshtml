@@ -7,7 +7,7 @@
 </div>
 
 <div class="row">
-    <table class="table table-bordered table-striped tablesorter">
+    <table class="table table-bordered table-striped sortable">
         <thead>
             <tr>
                 <th>Name</th>
@@ -19,12 +19,24 @@
             @foreach (var row in Model)
             {
                 <tr>
-                    <td>@row.Name</td>
+                    <td data-toggle="popover" title="Popover title" data-content="And here's some amazing content. It's very engaging. Right?" data-placement="top">@row.Name</td>
                     <td>@row.StepsToday</td>
                     <td>@row.StepsWeek</td>
                 </tr>
             }
-
         </tbody>
     </table>
 </div>
+@section Scripts{
+<script type="text/javascript">
+    $(function () {
+        $('body').popover({
+            selector: '[data-toggle="popover"]'
+        });
+
+        $('body').tooltip({
+            selector: 'a[rel="tooltip"], [data-toggle="tooltip"]'
+        });
+    });
+</script>
+}
